@@ -5,6 +5,7 @@ import { ko } from 'date-fns/locale';
 import { Calendar, Tag, TrendingUp, Archive, FileText, Trash2, Grid3X3, List, Eye } from 'lucide-react';
 import type { Idea } from '../types';
 import { storage } from '../utils/storage';
+import { Dashboard } from '../components/Dashboard';
 
 export function IdeaList() {
   const [ideas, setIdeas] = useState<Idea[]>([]);
@@ -15,15 +16,24 @@ export function IdeaList() {
     loadIdeas();
   }, []);
 
-  const loadIdeas = () => {
-    const storedIdeas = storage.getIdeas();
-    setIdeas(storedIdeas);
+  const loadIdeas = async () => {
+    try {
+      const storedIdeas = await storage.getIdeas();
+      setIdeas(storedIdeas);
+    } catch (error) {
+      console.error('Failed to load ideas:', error);
+    }
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirm('이 아이디어를 삭제하시겠습니까?')) {
-      storage.deleteIdea(id);
-      loadIdeas();
+      try {
+        await storage.deleteIdea(id);
+        loadIdeas();
+      } catch (error) {
+        console.error('Failed to delete idea:', error);
+        alert('아이디어 삭제에 실패했습니다.');
+      }
     }
   };
 
@@ -60,6 +70,7 @@ export function IdeaList() {
 
   return (
     <div>
+      <Dashboard ideas={ideas} />
       <div className="mb-6">
         <div className="flex justify-between items-center mb-4">
           <h1 className="text-3xl font-bold text-gray-900">아이디어 목록</h1>

@@ -4,6 +4,7 @@ import { IdeaList } from './pages/IdeaList';
 import { IdeaDetail } from './pages/IdeaDetail';
 import { IdeaForm } from './pages/IdeaForm';
 import { SearchPage } from './pages/SearchPage';
+import { DailyMemoPage } from './pages/DailyMemoPage';
 
 function App() {
   return (
@@ -15,6 +16,7 @@ function App() {
           <Route path="/new" element={<IdeaForm />} />
           <Route path="/edit/:id" element={<IdeaForm />} />
           <Route path="/search" element={<SearchPage />} />
+          <Route path="/memos" element={<DailyMemoPage />} />
         </Route>
       </Routes>
     </Router>
