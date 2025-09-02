@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
-import { format, parseISO, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, addDays, subDays } from 'date-fns';
+import { format, parseISO, addDays, subDays } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { 
-  Calendar, Save, Trash2, Edit, Heart, Star, Tag, 
+  Calendar, Save, Trash2, Edit, Tag, 
   Sun, Cloud, CloudRain, ChevronLeft, ChevronRight,
-  Target, Award, BookOpen, Smile, Meh, Frown
+  Target, Award, BookOpen, Smile, Meh, Frown, ArrowLeft, Heart
 } from 'lucide-react';
-import type { DailyMemo } from '../../server/routes/memos';
+import { Link, useParams } from 'react-router-dom';
 import { storage } from '../utils/storage';
 
 const MOOD_ICONS = {
@@ -24,7 +24,8 @@ const WEATHER_OPTIONS = [
 ];
 
 export function DailyMemoPage() {
-  const [selectedDate, setSelectedDate] = useState(new Date());
+  const { date } = useParams();
+  const [selectedDate, setSelectedDate] = useState(date ? parseISO(date) : new Date());
   const [memo, setMemo] = useState<any | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({
@@ -36,11 +37,15 @@ export function DailyMemoPage() {
     reflections: '',
     tags: [''],
   });
-  const [weekMemos, setWeekMemos] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (date) {
+      setSelectedDate(parseISO(date));
+    }
+  }, [date]);
 
   useEffect(() => {
     loadMemo();
-    loadWeekMemos();
   }, [selectedDate]);
 
   const loadMemo = async () => {
@@ -77,26 +82,6 @@ export function DailyMemoPage() {
     }
   };
 
-  const loadWeekMemos = async () => {
-    try {
-      const weekStart = startOfWeek(selectedDate, { weekStartsOn: 1 });
-      const weekEnd = endOfWeek(selectedDate, { weekStartsOn: 1 });
-      const weekDays = eachDayOfInterval({ start: weekStart, end: weekEnd });
-      
-      const memos = await Promise.all(
-        weekDays.map(async (day) => {
-          const dateString = format(day, 'yyyy-MM-dd');
-          const memo = await storage.getMemo(dateString);
-          return { date: day, memo };
-        })
-      );
-      
-      setWeekMemos(memos);
-    } catch (error) {
-      console.error('Failed to load week memos:', error);
-    }
-  };
-
   const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSelectedDate(parseISO(e.target.value));
   };
@@ -125,7 +110,6 @@ export function DailyMemoPage() {
 
       await storage.saveMemo(memoData);
       await loadMemo();
-      await loadWeekMemos();
       setIsEditing(false);
     } catch (error) {
       console.error('Failed to save memo:', error);
@@ -138,7 +122,6 @@ export function DailyMemoPage() {
       try {
         await storage.deleteMemo(memo.id);
         await loadMemo();
-        await loadWeekMemos();
       } catch (error) {
         console.error('Failed to delete memo:', error);
         alert('메모 삭제에 실패했습니다.');
@@ -168,424 +151,383 @@ export function DailyMemoPage() {
   };
 
   return (
-    <div className="max-w-6xl mx-auto">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-gray-900">일일 메모</h1>
-        <div className="flex items-center gap-4">
+    <div>
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center space-x-4">
+          <Link to="/memos" className="text-gray-400 hover:text-white transition-colors duration-200">
+            <ArrowLeft className="h-5 w-5" />
+          </Link>
+          <h1 className="text-2xl font-bold text-white">메모</h1>
+        </div>
+        <div className="flex items-center gap-3">
           <button
             onClick={() => setSelectedDate(subDays(selectedDate, 1))}
-            className="p-2 rounded-lg bg-white shadow hover:shadow-md transition-shadow"
+            className="p-2 rounded-lg bg-gray-800/50 border border-gray-700 hover:bg-gray-700/50 transition-all duration-200"
           >
-            <ChevronLeft className="h-5 w-5" />
+            <ChevronLeft className="h-5 w-5 text-gray-300" />
           </button>
           <div className="relative">
             <input
               type="date"
               value={format(selectedDate, 'yyyy-MM-dd')}
               onChange={handleDateChange}
-              className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg shadow-sm"
+              className="pl-10 pr-4 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
             />
             <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
           </div>
           <button
             onClick={() => setSelectedDate(addDays(selectedDate, 1))}
-            className="p-2 rounded-lg bg-white shadow hover:shadow-md transition-shadow"
+            className="p-2 rounded-lg bg-gray-800/50 border border-gray-700 hover:bg-gray-700/50 transition-all duration-200"
           >
-            <ChevronRight className="h-5 w-5" />
+            <ChevronRight className="h-5 w-5 text-gray-300" />
           </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* 주간 개요 */}
-        <div className="lg:col-span-1">
-          <div className="bg-white p-4 rounded-lg shadow">
-            <h3 className="font-semibold text-gray-900 mb-3">이번 주</h3>
-            <div className="space-y-2">
-              {weekMemos.map(({ date, memo }) => (
-                <div
-                  key={format(date, 'yyyy-MM-dd')}
-                  className={`flex items-center justify-between p-2 rounded cursor-pointer transition-colors ${
-                    isSameDay(date, selectedDate) ? 'bg-blue-100 text-blue-900' : 'hover:bg-gray-50'
-                  }`}
-                  onClick={() => setSelectedDate(date)}
-                >
-                  <span className="text-sm">{format(date, 'MM.dd (eee)', { locale: ko })}</span>
-                  <div className="flex items-center gap-1">
-                    {memo?.mood && (
-                      <div className={`w-2 h-2 rounded-full ${MOOD_ICONS[memo.mood]?.color.replace('text-', 'bg-')}`} />
-                    )}
-                    {memo?.isFavorite && <Star className="w-3 h-3 text-yellow-500" />}
-                    {memo && <div className="w-2 h-2 rounded-full bg-green-500" />}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+      <div className="bg-gray-800/50 p-6 rounded-lg border border-gray-700 backdrop-blur-sm">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-semibold text-white">
+            {format(selectedDate, 'yyyy년 MM월 dd일 (eeee)', { locale: ko })}
+          </h2>
+          {memo?.isFavorite && <Heart className="w-6 h-6 text-red-400 fill-current" />}
         </div>
 
-        {/* 메인 메모 영역 */}
-        <div className="lg:col-span-3">
-          <div className="bg-white p-6 rounded-lg shadow">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-semibold">
-                {format(selectedDate, 'yyyy년 MM월 dd일 (eeee)', { locale: ko })}
-              </h2>
-              {memo?.isFavorite && <Heart className="w-6 h-6 text-red-500 fill-current" />}
+        {isEditing ? (
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">오늘의 기분</label>
+                <div className="flex gap-2">
+                  {Object.entries(MOOD_ICONS).map(([mood, { icon: Icon, color, label }]) => (
+                    <button
+                      key={mood}
+                      type="button"
+                      onClick={() => setFormData(prev => ({ ...prev, mood: mood as any }))}
+                      className={`p-2 rounded-lg border-2 transition-all duration-200 ${
+                        formData.mood === mood 
+                          ? 'border-blue-500 bg-blue-900/30' 
+                          : 'border-gray-700 hover:border-gray-600 bg-gray-800/50'
+                      }`}
+                    >
+                      <Icon className={`w-6 h-6 ${color}`} />
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">날씨</label>
+                <div className="flex gap-2">
+                  {WEATHER_OPTIONS.map(({ value, icon: Icon, label }) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setFormData(prev => ({ ...prev, weather: value }))}
+                      className={`p-2 rounded-lg border-2 transition-all duration-200 ${
+                        formData.weather === value 
+                          ? 'border-blue-500 bg-blue-900/30' 
+                          : 'border-gray-700 hover:border-gray-600 bg-gray-800/50'
+                      }`}
+                    >
+                      <Icon className="w-6 h-6 text-gray-400" />
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
 
-            {isEditing ? (
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">오늘의 메모</label>
+              <textarea
+                value={formData.content}
+                onChange={(e) => setFormData(prev => ({ ...prev, content: e.target.value }))}
+                rows={6}
+                className="w-full p-3 bg-gray-800/50 border border-gray-700 rounded-lg resize-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-white placeholder-gray-400"
+                placeholder="오늘 하루는 어떠셨나요? 자유롭게 기록해보세요..."
+              />
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-sm font-medium text-gray-300">오늘의 목표</label>
+                <button
+                  type="button"
+                  onClick={() => addListItem('goals')}
+                  className="text-blue-400 hover:text-blue-300 text-sm"
+                >
+                  + 추가
+                </button>
+              </div>
+              <div className="space-y-2">
+                {formData.goals.map((goal, index) => (
+                  <div key={index} className="flex items-center gap-2">
+                    <Target className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                    <input
+                      type="text"
+                      value={goal}
+                      onChange={(e) => updateListItem('goals', index, e.target.value)}
+                      className="flex-1 p-2 bg-gray-800/50 border border-gray-700 rounded text-white placeholder-gray-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                      placeholder="목표를 입력하세요..."
+                    />
+                    {formData.goals.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeListItem('goals', index)}
+                        className="text-red-400 hover:text-red-300 p-1 rounded hover:bg-red-900/20 transition-all duration-200"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-sm font-medium text-gray-300">오늘의 성취</label>
+                <button
+                  type="button"
+                  onClick={() => addListItem('achievements')}
+                  className="text-blue-400 hover:text-blue-300 text-sm"
+                >
+                  + 추가
+                </button>
+              </div>
+              <div className="space-y-2">
+                {formData.achievements.map((achievement, index) => (
+                  <div key={index} className="flex items-center gap-2">
+                    <Award className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                    <input
+                      type="text"
+                      value={achievement}
+                      onChange={(e) => updateListItem('achievements', index, e.target.value)}
+                      className="flex-1 p-2 bg-gray-800/50 border border-gray-700 rounded text-white placeholder-gray-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                      placeholder="성취한 일을 입력하세요..."
+                    />
+                    {formData.achievements.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeListItem('achievements', index)}
+                        className="text-red-400 hover:text-red-300 p-1 rounded hover:bg-red-900/20 transition-all duration-200"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">오늘의 회고</label>
+              <textarea
+                value={formData.reflections}
+                onChange={(e) => setFormData(prev => ({ ...prev, reflections: e.target.value }))}
+                rows={3}
+                className="w-full p-3 bg-gray-800/50 border border-gray-700 rounded-lg resize-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-white placeholder-gray-400"
+                placeholder="오늘 하루를 되돌아보며 느낀 점을 적어보세요..."
+              />
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-sm font-medium text-gray-300">태그</label>
+                <button
+                  type="button"
+                  onClick={() => addListItem('tags')}
+                  className="text-blue-400 hover:text-blue-300 text-sm"
+                >
+                  + 추가
+                </button>
+              </div>
+              <div className="space-y-2">
+                {formData.tags.map((tag, index) => (
+                  <div key={index} className="flex items-center gap-2">
+                    <Tag className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                    <input
+                      type="text"
+                      value={tag}
+                      onChange={(e) => updateListItem('tags', index, e.target.value)}
+                      className="flex-1 p-2 bg-gray-800/50 border border-gray-700 rounded text-white placeholder-gray-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                      placeholder="태그를 입력하세요..."
+                    />
+                    {formData.tags.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeListItem('tags', index)}
+                        className="text-red-400 hover:text-red-300 p-1 rounded hover:bg-red-900/20 transition-all duration-200"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-4 border-t border-gray-700">
+              <button
+                onClick={handleSave}
+                className="px-6 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-500 hover:to-blue-600 flex items-center gap-2 transition-all duration-200 shadow-lg shadow-blue-600/25"
+              >
+                <Save className="h-4 w-4" />
+                저장
+              </button>
+              {memo && (
+                <button
+                  onClick={() => setIsEditing(false)}
+                  className="px-4 py-2 bg-gray-700/50 text-gray-300 rounded-lg hover:bg-gray-600/50 hover:text-white transition-all duration-200"
+                >
+                  취소
+                </button>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div>
+            {memo ? (
               <div className="space-y-6">
-                {/* 기본 정보 */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">오늘의 기분</label>
-                    <div className="flex gap-2">
-                      {Object.entries(MOOD_ICONS).map(([mood, { icon: Icon, color, label }]) => (
-                        <button
-                          key={mood}
-                          type="button"
-                          onClick={() => setFormData(prev => ({ ...prev, mood: mood as any }))}
-                          className={`p-2 rounded-lg border-2 transition-all ${
-                            formData.mood === mood 
-                              ? 'border-blue-500 bg-blue-50' 
-                              : 'border-gray-200 hover:border-gray-300'
-                          }`}
-                        >
-                          <Icon className={`w-6 h-6 ${color}`} />
-                        </button>
-                      ))}
+                <div className="flex items-center gap-6">
+                  {memo.mood && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-gray-600">기분:</span>
+                      {(() => {
+                        const MoodIcon = MOOD_ICONS[memo.mood]?.icon || Meh;
+                        return (
+                          <div className="flex items-center gap-1">
+                            <MoodIcon className={`w-5 h-5 ${MOOD_ICONS[memo.mood]?.color}`} />
+                            <span className="text-sm">{MOOD_ICONS[memo.mood]?.label}</span>
+                          </div>
+                        );
+                      })()}
                     </div>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">날씨</label>
-                    <div className="flex gap-2">
-                      {WEATHER_OPTIONS.map(({ value, icon: Icon, label }) => (
-                        <button
-                          key={value}
-                          type="button"
-                          onClick={() => setFormData(prev => ({ ...prev, weather: value }))}
-                          className={`p-2 rounded-lg border-2 transition-all ${
-                            formData.weather === value 
-                              ? 'border-blue-500 bg-blue-50' 
-                              : 'border-gray-200 hover:border-gray-300'
-                          }`}
-                        >
-                          <Icon className="w-6 h-6 text-gray-600" />
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                {/* 메인 내용 */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">오늘의 메모</label>
-                  <textarea
-                    value={formData.content}
-                    onChange={(e) => setFormData(prev => ({ ...prev, content: e.target.value }))}
-                    rows={6}
-                    className="w-full p-3 border border-gray-300 rounded-lg resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="오늘 하루는 어떠셨나요? 자유롭게 기록해보세요..."
-                  />
-                </div>
-
-                {/* 목표 */}
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="block text-sm font-medium text-gray-700">오늘의 목표</label>
-                    <button
-                      type="button"
-                      onClick={() => addListItem('goals')}
-                      className="text-blue-600 hover:text-blue-800 text-sm"
-                    >
-                      + 추가
-                    </button>
-                  </div>
-                  <div className="space-y-2">
-                    {formData.goals.map((goal, index) => (
-                      <div key={index} className="flex items-center gap-2">
-                        <Target className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                        <input
-                          type="text"
-                          value={goal}
-                          onChange={(e) => updateListItem('goals', index, e.target.value)}
-                          className="flex-1 p-2 border border-gray-300 rounded"
-                          placeholder="목표를 입력하세요..."
-                        />
-                        {formData.goals.length > 1 && (
-                          <button
-                            type="button"
-                            onClick={() => removeListItem('goals', index)}
-                            className="text-red-500 hover:text-red-700"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* 성취 */}
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="block text-sm font-medium text-gray-700">오늘의 성취</label>
-                    <button
-                      type="button"
-                      onClick={() => addListItem('achievements')}
-                      className="text-blue-600 hover:text-blue-800 text-sm"
-                    >
-                      + 추가
-                    </button>
-                  </div>
-                  <div className="space-y-2">
-                    {formData.achievements.map((achievement, index) => (
-                      <div key={index} className="flex items-center gap-2">
-                        <Award className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                        <input
-                          type="text"
-                          value={achievement}
-                          onChange={(e) => updateListItem('achievements', index, e.target.value)}
-                          className="flex-1 p-2 border border-gray-300 rounded"
-                          placeholder="성취한 일을 입력하세요..."
-                        />
-                        {formData.achievements.length > 1 && (
-                          <button
-                            type="button"
-                            onClick={() => removeListItem('achievements', index)}
-                            className="text-red-500 hover:text-red-700"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* 회고 */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">오늘의 회고</label>
-                  <textarea
-                    value={formData.reflections}
-                    onChange={(e) => setFormData(prev => ({ ...prev, reflections: e.target.value }))}
-                    rows={3}
-                    className="w-full p-3 border border-gray-300 rounded-lg resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="오늘 하루를 되돌아보며 느낀 점을 적어보세요..."
-                  />
-                </div>
-
-                {/* 태그 */}
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="block text-sm font-medium text-gray-700">태그</label>
-                    <button
-                      type="button"
-                      onClick={() => addListItem('tags')}
-                      className="text-blue-600 hover:text-blue-800 text-sm"
-                    >
-                      + 추가
-                    </button>
-                  </div>
-                  <div className="space-y-2">
-                    {formData.tags.map((tag, index) => (
-                      <div key={index} className="flex items-center gap-2">
-                        <Tag className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                        <input
-                          type="text"
-                          value={tag}
-                          onChange={(e) => updateListItem('tags', index, e.target.value)}
-                          className="flex-1 p-2 border border-gray-300 rounded"
-                          placeholder="태그를 입력하세요..."
-                        />
-                        {formData.tags.length > 1 && (
-                          <button
-                            type="button"
-                            onClick={() => removeListItem('tags', index)}
-                            className="text-red-500 hover:text-red-700"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* 저장 버튼 */}
-                <div className="flex justify-end gap-2 pt-4 border-t">
-                  <button
-                    onClick={handleSave}
-                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2 transition-colors"
-                  >
-                    <Save className="h-4 w-4" />
-                    저장
-                  </button>
-                  {memo && (
-                    <button
-                      onClick={() => setIsEditing(false)}
-                      className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition-colors"
-                    >
-                      취소
-                    </button>
                   )}
+                  {memo.weather && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-gray-600">날씨:</span>
+                      {(() => {
+                        const weatherOption = WEATHER_OPTIONS.find(w => w.value === memo.weather);
+                        if (weatherOption) {
+                          const WeatherIcon = weatherOption.icon;
+                          return (
+                            <div className="flex items-center gap-1">
+                              <WeatherIcon className="w-5 h-5 text-gray-600" />
+                              <span className="text-sm">{weatherOption.label}</span>
+                            </div>
+                          );
+                        }
+                        return null;
+                      })()}
+                    </div>
+                  )}
+                </div>
+
+                {memo.content && (
+                  <div className="prose max-w-none">
+                    <div className="whitespace-pre-wrap text-gray-300 leading-relaxed">
+                      {memo.content}
+                    </div>
+                  </div>
+                )}
+
+                {memo.goals?.length > 0 && (
+                  <div>
+                    <h3 className="flex items-center gap-2 text-lg font-medium text-white mb-3">
+                      <Target className="w-5 h-5 text-blue-400" />
+                      오늘의 목표
+                    </h3>
+                    <ul className="space-y-2">
+                      {memo.goals.map((goal: string, index: number) => (
+                        <li key={index} className="flex items-center gap-2 text-gray-300">
+                          <div className="w-2 h-2 rounded-full bg-blue-400 flex-shrink-0" />
+                          {goal}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {memo.achievements?.length > 0 && (
+                  <div>
+                    <h3 className="flex items-center gap-2 text-lg font-medium text-white mb-3">
+                      <Award className="w-5 h-5 text-emerald-400" />
+                      오늘의 성취
+                    </h3>
+                    <ul className="space-y-2">
+                      {memo.achievements.map((achievement: string, index: number) => (
+                        <li key={index} className="flex items-center gap-2 text-gray-300">
+                          <div className="w-2 h-2 rounded-full bg-emerald-400 flex-shrink-0" />
+                          {achievement}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {memo.reflections && (
+                  <div>
+                    <h3 className="flex items-center gap-2 text-lg font-medium text-white mb-3">
+                      <BookOpen className="w-5 h-5 text-purple-400" />
+                      오늘의 회고
+                    </h3>
+                    <div className="p-4 bg-gray-700/30 rounded-lg border border-gray-700">
+                      <div className="whitespace-pre-wrap text-gray-300 leading-relaxed">
+                        {memo.reflections}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {memo.tags?.length > 0 && (
+                  <div>
+                    <h3 className="flex items-center gap-2 text-lg font-medium text-white mb-3">
+                      <Tag className="w-5 h-5 text-indigo-400" />
+                      태그
+                    </h3>
+                    <div className="flex flex-wrap gap-2">
+                      {memo.tags.map((tag: string, index: number) => (
+                        <span
+                          key={index}
+                          className="px-3 py-1 bg-indigo-900/30 text-indigo-300 rounded-full text-sm border border-indigo-700"
+                        >
+                          #{tag}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex justify-end gap-2 pt-4 border-t border-gray-700">
+                  <button
+                    onClick={() => setIsEditing(true)}
+                    className="px-4 py-2 bg-gray-700/50 text-gray-300 rounded-lg hover:bg-gray-600/50 hover:text-white flex items-center gap-2 transition-all duration-200"
+                  >
+                    <Edit className="h-4 w-4" />
+                    수정
+                  </button>
+                  <button
+                    onClick={handleDelete}
+                    className="px-4 py-2 bg-red-900/30 text-red-300 rounded-lg hover:bg-red-900/50 hover:text-red-200 flex items-center gap-2 transition-all duration-200 border border-red-700"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    삭제
+                  </button>
                 </div>
               </div>
             ) : (
-              <div>
-                {memo ? (
-                  <div className="space-y-6">
-                    {/* 기분과 날씨 */}
-                    <div className="flex items-center gap-6">
-                      {memo.mood && (
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm text-gray-600">기분:</span>
-                          {(() => {
-                            const MoodIcon = MOOD_ICONS[memo.mood]?.icon || Meh;
-                            return (
-                              <div className="flex items-center gap-1">
-                                <MoodIcon className={`w-5 h-5 ${MOOD_ICONS[memo.mood]?.color}`} />
-                                <span className="text-sm">{MOOD_ICONS[memo.mood]?.label}</span>
-                              </div>
-                            );
-                          })()}
-                        </div>
-                      )}
-                      {memo.weather && (
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm text-gray-600">날씨:</span>
-                          {(() => {
-                            const weatherOption = WEATHER_OPTIONS.find(w => w.value === memo.weather);
-                            if (weatherOption) {
-                              const WeatherIcon = weatherOption.icon;
-                              return (
-                                <div className="flex items-center gap-1">
-                                  <WeatherIcon className="w-5 h-5 text-gray-600" />
-                                  <span className="text-sm">{weatherOption.label}</span>
-                                </div>
-                              );
-                            }
-                            return null;
-                          })()}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* 메인 내용 */}
-                    {memo.content && (
-                      <div className="prose max-w-none">
-                        <div className="whitespace-pre-wrap text-gray-800 leading-relaxed">
-                          {memo.content}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* 목표 */}
-                    {memo.goals?.length > 0 && (
-                      <div>
-                        <h3 className="flex items-center gap-2 text-lg font-medium text-gray-900 mb-3">
-                          <Target className="w-5 h-5" />
-                          오늘의 목표
-                        </h3>
-                        <ul className="space-y-2">
-                          {memo.goals.map((goal: string, index: number) => (
-                            <li key={index} className="flex items-center gap-2 text-gray-700">
-                              <div className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0" />
-                              {goal}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-
-                    {/* 성취 */}
-                    {memo.achievements?.length > 0 && (
-                      <div>
-                        <h3 className="flex items-center gap-2 text-lg font-medium text-gray-900 mb-3">
-                          <Award className="w-5 h-5" />
-                          오늘의 성취
-                        </h3>
-                        <ul className="space-y-2">
-                          {memo.achievements.map((achievement: string, index: number) => (
-                            <li key={index} className="flex items-center gap-2 text-gray-700">
-                              <div className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" />
-                              {achievement}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-
-                    {/* 회고 */}
-                    {memo.reflections && (
-                      <div>
-                        <h3 className="flex items-center gap-2 text-lg font-medium text-gray-900 mb-3">
-                          <BookOpen className="w-5 h-5" />
-                          오늘의 회고
-                        </h3>
-                        <div className="p-4 bg-gray-50 rounded-lg">
-                          <div className="whitespace-pre-wrap text-gray-700 leading-relaxed">
-                            {memo.reflections}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* 태그 */}
-                    {memo.tags?.length > 0 && (
-                      <div>
-                        <h3 className="flex items-center gap-2 text-lg font-medium text-gray-900 mb-3">
-                          <Tag className="w-5 h-5" />
-                          태그
-                        </h3>
-                        <div className="flex flex-wrap gap-2">
-                          {memo.tags.map((tag: string, index: number) => (
-                            <span
-                              key={index}
-                              className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm"
-                            >
-                              #{tag}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* 액션 버튼 */}
-                    <div className="flex justify-end gap-2 pt-4 border-t">
-                      <button
-                        onClick={() => setIsEditing(true)}
-                        className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 flex items-center gap-2 transition-colors"
-                      >
-                        <Edit className="h-4 w-4" />
-                        수정
-                      </button>
-                      <button
-                        onClick={handleDelete}
-                        className="px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 flex items-center gap-2 transition-colors"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                        삭제
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-center py-12">
-                    <Calendar className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-                    <p className="text-gray-500 mb-4">이 날짜에 작성된 메모가 없습니다.</p>
-                    <button
-                      onClick={() => setIsEditing(true)}
-                      className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                    >
-                      메모 작성하기
-                    </button>
-                  </div>
-                )}
+              <div className="text-center py-12">
+                <Calendar className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+                <p className="text-gray-400 mb-4">이 날짜에 작성된 메모가 없습니다.</p>
+                <button
+                  onClick={() => setIsEditing(true)}
+                  className="px-6 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-500 hover:to-purple-500 transition-all duration-200 shadow-lg shadow-blue-600/25"
+                >
+                  메모 작성하기
+                </button>
               </div>
             )}
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
