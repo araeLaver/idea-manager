@@ -53,7 +53,7 @@ describe('Layout Component', () => {
 
     // 액션 버튼들 확인
     expect(screen.getByTitle(/다크 모드로 전환|라이트 모드로 전환/)).toBeInTheDocument();
-    expect(screen.getByTitle('검색 (Ctrl+K)')).toBeInTheDocument();
+    expect(screen.getByTitle('검색')).toBeInTheDocument();
     expect(screen.getByText('새 아이디어')).toBeInTheDocument();
   });
 
@@ -71,15 +71,15 @@ describe('Layout Component', () => {
     expect(themeButton).toBeInTheDocument();
   });
 
-  it('should have keyboard shortcuts help button', () => {
+  it('should have AI assistant button', () => {
     render(
       <MockProviders>
         <Layout />
       </MockProviders>
     );
 
-    const keyboardButton = screen.getByTitle('키보드 단축키 (Ctrl+?)');
-    expect(keyboardButton).toBeInTheDocument();
+    const aiButton = screen.getByTitle('AI 어시스턴트');
+    expect(aiButton).toBeInTheDocument();
   });
 
   it('should highlight active navigation item', () => {
@@ -91,6 +91,6 @@ describe('Layout Component', () => {
 
     // 현재 경로가 '/'이므로 대시보드가 활성화되어야 함
     const dashboardLink = screen.getByText('대시보드').closest('a');
-    expect(dashboardLink).toHaveClass('bg-brand');
+    expect(dashboardLink).toHaveClass('bg-primary');
   });
 });
