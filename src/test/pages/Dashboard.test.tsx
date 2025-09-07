@@ -38,8 +38,7 @@ const mockIdeas: Idea[] = [
     potentialRevenue: '1000만원',
     resources: '비즈니스 팀 3명',
     timeline: '6개월',
-    notes: '비즈니스 노트',
-    updatedAt: '2024-01-02T00:00:00.000Z'
+    notes: '비즈니스 노트'
   },
 ];
 

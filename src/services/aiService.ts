@@ -19,7 +19,7 @@ interface TagSuggestion {
 }
 
 // 스마트 아이디어 데이터베이스 (무료)
-const smartSuggestions: IdeaSuggestion[] = [
+const ideaSuggestions: IdeaSuggestion[] = [
   {
     title: "스마트 식물 관리 시스템",
     description: "IoT 센서를 활용하여 식물의 수분, 조도, 온도를 모니터링하고 자동으로 물을 주는 시스템",
@@ -135,7 +135,7 @@ export const aiService = {
           const text = (title + " " + description).toLowerCase();
           const suggestedTags: string[] = [];
           
-          Object.values(categoryKeywords).flat().forEach(keyword => {
+          Object.values(categoryKeywords).flat().forEach((keyword: string) => {
             if (text.includes(keyword.toLowerCase()) && !suggestedTags.includes(keyword)) {
               suggestedTags.push(keyword);
             }
@@ -169,8 +169,8 @@ export const aiService = {
   async generateIdeaSuggestions(keyword?: string, category?: string): Promise<IdeaSuggestion[]> {
     // 실제 환경에서는 OpenAI API 호출
     
-    // 모의 구현: 미리 정의된 아이디어 반환
-    let suggestions = [...mockSuggestions];
+    // 스마트 아이디어 데이터베이스에서 제안
+    let suggestions = [...ideaSuggestions];
     
     if (category) {
       suggestions = suggestions.filter(s => s.category === category);
