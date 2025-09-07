@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
-import { ArrowLeft, Plus, X } from 'lucide-react';
+import { ArrowLeft, Plus, X, Calendar, Clock } from 'lucide-react';
 import type { IdeaFormData, Idea } from '../types';
-import { storage } from '../utils/storage';
+import { useData } from '../contexts/DataContext';
+import { AIFeatures } from '../components/AIFeatures';
 
 export function IdeaForm() {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const isEdit = !!id;
+  const { createIdea, updateIdea, getIdea } = useData();
 
   const [formData, setFormData] = useState<IdeaFormData>({
     title: '',
@@ -23,47 +25,51 @@ export function IdeaForm() {
     timeline: ''
   });
 
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [startTime, setStartTime] = useState('09:00');
+  const [endTime, setEndTime] = useState('18:00');
+
   const [tagInput, setTagInput] = useState('');
 
   useEffect(() => {
     if (isEdit && id) {
-      const idea = storage.getIdea(id);
-      if (idea) {
-        setFormData({
-          title: idea.title,
-          description: idea.description,
-          category: idea.category,
-          tags: idea.tags,
-          status: idea.status,
-          priority: idea.priority,
-          notes: idea.notes || '',
-          targetMarket: idea.targetMarket || '',
-          potentialRevenue: idea.potentialRevenue || '',
-          resources: idea.resources || '',
-          timeline: idea.timeline || ''
-        });
-      } else {
-        navigate('/');
-      }
+      getIdea(id).then(idea => {
+        if (idea) {
+          setFormData({
+            title: idea.title,
+            description: idea.description,
+            category: idea.category,
+            tags: idea.tags,
+            status: idea.status,
+            priority: idea.priority,
+            notes: idea.notes || '',
+            targetMarket: idea.targetMarket || '',
+            potentialRevenue: idea.potentialRevenue || '',
+            resources: idea.resources || '',
+            timeline: idea.timeline || ''
+          });
+        } else {
+          navigate('/');
+        }
+      });
     }
-  }, [id, isEdit, navigate]);
+  }, [id, isEdit, navigate, getIdea]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (isEdit && id) {
-      storage.updateIdea(id, formData);
-    } else {
-      const newIdea: Idea = {
-        ...formData,
-        id: Date.now().toString(),
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
-      storage.addIdea(newIdea);
+    try {
+      if (isEdit && id) {
+        await updateIdea(id, formData);
+      } else {
+        await createIdea(formData);
+      }
+      navigate('/');
+    } catch (error) {
+      console.error('아이디어 저장 실패:', error);
+      alert('아이디어 저장에 실패했습니다.');
     }
-    
-    navigate('/');
   };
 
   const handleAddTag = () => {
@@ -73,11 +79,40 @@ export function IdeaForm() {
     }
   };
 
+  const handleCategorySelect = (category: string) => {
+    setFormData({ ...formData, category });
+  };
+
+  const handleTagsSelect = (tags: string[]) => {
+    const newTags = [...formData.tags];
+    tags.forEach(tag => {
+      if (!newTags.includes(tag)) {
+        newTags.push(tag);
+      }
+    });
+    setFormData({ ...formData, tags: newTags });
+  };
+
   const handleRemoveTag = (tagToRemove: string) => {
     setFormData({
       ...formData,
       tags: formData.tags.filter(tag => tag !== tagToRemove)
     });
+  };
+
+  const updateTimeline = () => {
+    if (startDate && endDate) {
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      const diffTime = Math.abs(end.getTime() - start.getTime());
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      const startDateStr = start.toLocaleDateString('ko-KR');
+      const endDateStr = end.toLocaleDateString('ko-KR');
+      
+      const timelineText = `${startDateStr} ~ ${endDateStr} (${diffDays}일간, ${startTime} - ${endTime})`;
+      setFormData(prev => ({ ...prev, timeline: timelineText }));
+    }
   };
 
   return (
@@ -122,6 +157,14 @@ export function IdeaForm() {
               placeholder="아이디어에 대한 설명을 입력하세요"
             />
           </div>
+
+          {/* AI Features */}
+          <AIFeatures
+            title={formData.title}
+            description={formData.description}
+            onCategorySelect={handleCategorySelect}
+            onTagsSelect={handleTagsSelect}
+          />
 
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -251,15 +294,108 @@ export function IdeaForm() {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              타임라인
+              프로젝트 일정
             </label>
-            <input
-              type="text"
-              value={formData.timeline}
-              onChange={(e) => setFormData({ ...formData, timeline: e.target.value })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="예상 개발/실행 기간"
-            />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* 시작일 */}
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  <Calendar className="h-3 w-3 inline mr-1" />
+                  시작일
+                </label>
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => {
+                    setStartDate(e.target.value);
+                    updateTimeline();
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                />
+              </div>
+              
+              {/* 종료일 */}
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  <Calendar className="h-3 w-3 inline mr-1" />
+                  종료일 (예상)
+                </label>
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => {
+                    setEndDate(e.target.value);
+                    updateTimeline();
+                  }}
+                  min={startDate}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                />
+              </div>
+              
+              {/* 시작 시간 */}
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  <Clock className="h-3 w-3 inline mr-1" />
+                  작업 시작 시간
+                </label>
+                <select
+                  value={startTime}
+                  onChange={(e) => {
+                    setStartTime(e.target.value);
+                    updateTimeline();
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                >
+                  {Array.from({ length: 24 }, (_, i) => {
+                    const hour = i.toString().padStart(2, '0');
+                    return (
+                      <option key={i} value={`${hour}:00`}>
+                        {hour}:00
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+              
+              {/* 종료 시간 */}
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  <Clock className="h-3 w-3 inline mr-1" />
+                  작업 종료 시간
+                </label>
+                <select
+                  value={endTime}
+                  onChange={(e) => {
+                    setEndTime(e.target.value);
+                    updateTimeline();
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                >
+                  {Array.from({ length: 24 }, (_, i) => {
+                    const hour = i.toString().padStart(2, '0');
+                    return (
+                      <option key={i} value={`${hour}:00`}>
+                        {hour}:00
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+            </div>
+            
+            {/* 자동 생성된 타임라인 텍스트 */}
+            <div className="mt-3">
+              <label className="block text-xs font-medium text-gray-600 mb-1">
+                타임라인 요약
+              </label>
+              <textarea
+                value={formData.timeline}
+                onChange={(e) => setFormData({ ...formData, timeline: e.target.value })}
+                rows={2}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                placeholder="자동 생성된 타임라인 또는 직접 입력"
+              />
+            </div>
           </div>
 
           <div>
